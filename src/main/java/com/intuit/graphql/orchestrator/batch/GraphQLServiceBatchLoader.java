@@ -36,6 +36,8 @@ import graphql.schema.GraphQLObjectType;
 import graphql.schema.GraphQLOutputType;
 import graphql.schema.GraphQLSchema;
 import graphql.schema.GraphQLType;
+
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -115,7 +117,7 @@ public class GraphQLServiceBatchLoader implements BatchLoader<DataFetchingEnviro
       if (filteredRootField != null) {
         filteredRootField.getFields().stream()
             .map(field -> serviceMetadata.hasFieldResolverDirective()
-                ? removeFieldsWithExternalTypes(field, getRootFieldDefinition(key.getExecutionStepInfo()).getType())
+                ? removeFieldsWithExternalTypes(field, getRootFieldDefinition(key.getExecutionStepInfo()).getType(), key.getFragmentsByName())
                 : field
             )
             .forEach(selectionSetBuilder::selection);
@@ -126,7 +128,7 @@ public class GraphQLServiceBatchLoader implements BatchLoader<DataFetchingEnviro
           FragmentDefinition old = mergedFragmentDefinitions.get(fragmentDefinition.getName());
 
           List<Selection> newSelections = fragmentDefinition.getSelectionSet().getSelections();
-          List<Selection> oldSelections = old.getSelectionSet().getSelections();
+          List<Selection> oldSelections = new ArrayList<>(old.getSelectionSet().getSelections());
 
           oldSelections.addAll(newSelections);
 
@@ -145,7 +147,7 @@ public class GraphQLServiceBatchLoader implements BatchLoader<DataFetchingEnviro
         svcFragmentDefinitions.forEach((fragmentName, fragmentDefinition) -> {
           String typeConditionName = fragmentDefinition.getTypeCondition().getName();
           GraphQLFieldsContainer parentType = (GraphQLFieldsContainer) graphQLSchema.getType(typeConditionName);
-          FragmentDefinition transformedFragment = removeFieldsWithExternalTypes(fragmentDefinition, parentType);
+          FragmentDefinition transformedFragment = removeFieldsWithExternalTypes(fragmentDefinition, parentType, key.getFragmentsByName());
           finalServiceFragmentDefinitions.put(fragmentName, removeDomainTypeFromFragment(transformedFragment));
         });
         mergedFragmentDefinitions.putAll(finalServiceFragmentDefinitions);
@@ -268,11 +270,11 @@ public class GraphQLServiceBatchLoader implements BatchLoader<DataFetchingEnviro
    * @return a modified fragment definition
    */
   private FragmentDefinition removeFieldsWithExternalTypes(final FragmentDefinition origFragmentDefinition,
-      GraphQLType typeCondition) {
+      GraphQLType typeCondition, Map<String, FragmentDefinition> fragmentsByName) {
     // call serviceMetadata.hasFieldResolverDirective() before calling this method
     return (FragmentDefinition) AST_TRANSFORMER.transform(origFragmentDefinition,
-        new NoExternalReferenceSelectionSetModifier((GraphQLFieldsContainer) unwrapAll(typeCondition)));
-
+        new NoExternalReferenceSelectionSetModifier((GraphQLFieldsContainer) unwrapAll(typeCondition),
+            serviceMetadata, fragmentsByName));
   }
 
   /**
@@ -302,10 +304,11 @@ public class GraphQLServiceBatchLoader implements BatchLoader<DataFetchingEnviro
    * NoExternalReferenceSelectionSetModifier}
    * @return a modified field
    */
-  private Field removeFieldsWithExternalTypes(Field origField, GraphQLOutputType fieldType) {
+  private Field removeFieldsWithExternalTypes(Field origField, GraphQLOutputType fieldType, Map<String,
+      FragmentDefinition> fragmentsByName) {
     // call serviceMetadata.hasFieldResolverDirective() before calling this method
     return (Field) AST_TRANSFORMER.transform(origField,
-        new NoExternalReferenceSelectionSetModifier((GraphQLFieldsContainer) unwrapAll(fieldType)));
+        new NoExternalReferenceSelectionSetModifier((GraphQLFieldsContainer) unwrapAll(fieldType), serviceMetadata, fragmentsByName));
   }
 
   private GraphQLSchema getSchema(List<DataFetchingEnvironment> environments) {

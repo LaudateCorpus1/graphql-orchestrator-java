@@ -1,5 +1,8 @@
 package com.intuit.graphql.orchestrator.fieldresolver;
 
+import static com.intuit.graphql.orchestrator.XtextObjectCreationUtil.buildFieldDefinition;
+import static com.intuit.graphql.orchestrator.XtextObjectCreationUtil.buildObjectTypeDefinition;
+import static java.util.Collections.singletonList;
 import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
 import static org.mockito.Mockito.when;
 
@@ -15,15 +18,16 @@ import com.intuit.graphql.orchestrator.resolverdirective.ResolverDirectiveDefini
 import com.intuit.graphql.orchestrator.schema.transform.FieldResolverContext;
 import com.intuit.graphql.orchestrator.xtext.GraphQLFactoryDelegate;
 import graphql.Scalars;
+import graphql.language.Argument;
 import graphql.language.BooleanValue;
 import graphql.language.EnumValue;
 import graphql.language.Field;
 import graphql.language.IntValue;
+import graphql.language.ObjectValue;
 import graphql.language.SelectionSet;
 import graphql.language.StringValue;
 import graphql.schema.DataFetchingEnvironment;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -41,9 +45,6 @@ public class FieldResolverBatchSelectionSetSupplierLiteralsTest {
 
     @Mock
     private Field dfeFieldMock;
-
-    @Mock
-    private ObjectTypeDefinition parentTypeOfFieldWithResolver;
 
     @Mock
     private FieldDefinition fieldDefinitionWithResolver;
@@ -66,6 +67,9 @@ public class FieldResolverBatchSelectionSetSupplierLiteralsTest {
         when(dataFetchingEnvironmentMock.getSource()).thenReturn(testDFEDataSource);
         dataFetchingEnvironments.add(dataFetchingEnvironmentMock);
 
+        FieldDefinition childFieldDefinition = buildFieldDefinition("childField");
+        ObjectTypeDefinition parentTypeOfFieldWithResolver = buildObjectTypeDefinition("ParentType", singletonList(childFieldDefinition));
+
         testFieldResolverContext = FieldResolverContext.builder()
             .parentTypeDefinition(parentTypeOfFieldWithResolver)
             .fieldDefinition(fieldDefinitionWithResolver)
@@ -86,8 +90,8 @@ public class FieldResolverBatchSelectionSetSupplierLiteralsTest {
         ObjectType objectType = GraphQLFactoryDelegate.createObjectType();
         objectType.setType(petIdType);
 
-        when(resolverDirectiveDefinitionMock.getArguments()).thenReturn(Collections.singletonList(
-            new ResolverArgumentDefinition("name", "{ id : \"$petId\" }", objectType)
+        when(resolverDirectiveDefinitionMock.getArguments()).thenReturn(singletonList(
+            new ResolverArgumentDefinition("petIdInputObject", "{ id : \"$petId\" }", objectType)
         ));
 
         String[] resolverSelectedFields = new String[] {"petById"};
@@ -99,7 +103,15 @@ public class FieldResolverBatchSelectionSetSupplierLiteralsTest {
         // THEN
         SelectionSet actual = subject.get();
 
-        assertThat(actual).isNotNull();
+        Field actualPetByIdField = (Field)actual.getSelections().get(0);
+        Argument actualArgument = actualPetByIdField.getArguments().get(0);
+        assertThat(actualArgument.getName()).isEqualTo("petIdInputObject");
+        ObjectValue actualArgumentValue = (ObjectValue)actualArgument.getValue();
+        assertThat(actualArgumentValue.getObjectFields().get(0).getName()).isEqualTo("id");
+        StringValue actualStringValue = (StringValue) actualArgumentValue.getObjectFields().get(0).getValue();
+        assertThat(actualStringValue.getValue()).isEqualTo("pet-901");
+
+
     }
 
     @Test
@@ -109,7 +121,7 @@ public class FieldResolverBatchSelectionSetSupplierLiteralsTest {
         targetArgumentType.setType(Scalars.GraphQLID.getName());
         targetArgumentType.setNonNull(false);
 
-        when(resolverDirectiveDefinitionMock.getArguments()).thenReturn(Collections.singletonList(
+        when(resolverDirectiveDefinitionMock.getArguments()).thenReturn(singletonList(
             new ResolverArgumentDefinition("argName", "stringArgumentValue", targetArgumentType)));
 
         String[] resolverSelectedFields = new String[] {"targetField"};
@@ -136,7 +148,7 @@ public class FieldResolverBatchSelectionSetSupplierLiteralsTest {
         targetArgumentType.setType(Scalars.GraphQLID.getName());
         targetArgumentType.setNonNull(false);
 
-        when(resolverDirectiveDefinitionMock.getArguments()).thenReturn(Collections.singletonList(
+        when(resolverDirectiveDefinitionMock.getArguments()).thenReturn(singletonList(
             new ResolverArgumentDefinition("argName", "123456789", targetArgumentType)));
 
         String[] resolverSelectedFields = new String[] {"targetField"};
@@ -163,7 +175,7 @@ public class FieldResolverBatchSelectionSetSupplierLiteralsTest {
         targetArgumentType.setType(Scalars.GraphQLString.getName());
         targetArgumentType.setNonNull(false);
 
-        when(resolverDirectiveDefinitionMock.getArguments()).thenReturn(Collections.singletonList(
+        when(resolverDirectiveDefinitionMock.getArguments()).thenReturn(singletonList(
             new ResolverArgumentDefinition("argName", "stringArgumentValue", targetArgumentType)));
 
         String[] resolverSelectedFields = new String[] {"targetField"};
@@ -190,7 +202,7 @@ public class FieldResolverBatchSelectionSetSupplierLiteralsTest {
         targetArgumentType.setType(Scalars.GraphQLString.getName());
         targetArgumentType.setNonNull(true);
 
-        when(resolverDirectiveDefinitionMock.getArguments()).thenReturn(Collections.singletonList(
+        when(resolverDirectiveDefinitionMock.getArguments()).thenReturn(singletonList(
             new ResolverArgumentDefinition("argName", "stringArgumentValue", targetArgumentType)));
 
         String[] resolverSelectedFields = new String[] {"targetField"};
@@ -217,7 +229,7 @@ public class FieldResolverBatchSelectionSetSupplierLiteralsTest {
         targetArgumentType.setType(Scalars.GraphQLString.getName());
         targetArgumentType.setNonNull(false);
 
-        when(resolverDirectiveDefinitionMock.getArguments()).thenReturn(Collections.singletonList(
+        when(resolverDirectiveDefinitionMock.getArguments()).thenReturn(singletonList(
             new ResolverArgumentDefinition("argName", "123456789", targetArgumentType)));
 
         String[] resolverSelectedFields = new String[] {"targetField"};
@@ -244,7 +256,7 @@ public class FieldResolverBatchSelectionSetSupplierLiteralsTest {
         targetArgumentType.setType(Scalars.GraphQLString.getName());
         targetArgumentType.setNonNull(false);
 
-        when(resolverDirectiveDefinitionMock.getArguments()).thenReturn(Collections.singletonList(
+        when(resolverDirectiveDefinitionMock.getArguments()).thenReturn(singletonList(
             new ResolverArgumentDefinition("argName", "true", targetArgumentType)));
 
         String[] resolverSelectedFields = new String[] {"targetField"};
@@ -271,7 +283,7 @@ public class FieldResolverBatchSelectionSetSupplierLiteralsTest {
         targetArgumentType.setType(Scalars.GraphQLInt.getName());
         targetArgumentType.setNonNull(false);
 
-        when(resolverDirectiveDefinitionMock.getArguments()).thenReturn(Collections.singletonList(
+        when(resolverDirectiveDefinitionMock.getArguments()).thenReturn(singletonList(
             new ResolverArgumentDefinition("argName", "123456789", targetArgumentType)));
 
         String[] resolverSelectedFields = new String[] {"targetField"};
@@ -298,7 +310,7 @@ public class FieldResolverBatchSelectionSetSupplierLiteralsTest {
         targetArgumentType.setType(Scalars.GraphQLBoolean.getName());
         targetArgumentType.setNonNull(false);
 
-        when(resolverDirectiveDefinitionMock.getArguments()).thenReturn(Collections.singletonList(
+        when(resolverDirectiveDefinitionMock.getArguments()).thenReturn(singletonList(
             new ResolverArgumentDefinition("argName", "true", targetArgumentType)));
 
         String[] resolverSelectedFields = new String[] {"targetField"};
@@ -331,7 +343,7 @@ public class FieldResolverBatchSelectionSetSupplierLiteralsTest {
         ObjectType targetArgNamedType = GraphQLFactoryDelegate.createObjectType();
         targetArgNamedType.setType(targetArgumentType);
 
-        when(resolverDirectiveDefinitionMock.getArguments()).thenReturn(Collections.singletonList(
+        when(resolverDirectiveDefinitionMock.getArguments()).thenReturn(singletonList(
             new ResolverArgumentDefinition("argName", "ENUM_VALUE_1", targetArgNamedType)));
 
         String[] resolverSelectedFields = new String[] {"targetField"};
